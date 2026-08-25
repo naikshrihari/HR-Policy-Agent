@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hr-policy-agent"
+version = "0.1.0"
+description = "LangChain/LangGraph port of the Oracle Fusion HR Policy Workflow Agent (Station Casinos HCM Policy Agent)."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "typing_extensions>=4.7",
+]
+
+[project.optional-dependencies]
+openai = ["langchain-openai>=0.2.0"]
+anthropic = ["langchain-anthropic>=0.2.0"]
+ollama = ["langchain-ollama>=0.2.0"]
+rest = ["requests>=2.31"]
+rag = ["langchain-community>=0.3.0", "langchain-text-splitters>=0.3.0", "faiss-cpu>=1.8", "sentence-transformers>=3.0"]
+
+[project.scripts]
+hr-policy-agent = "hr_policy_agent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["hr_policy_agent*"]
+
+[tool.setuptools.package-data]
+hr_policy_agent = ["prompts/*.txt", "prompts/*.json"]

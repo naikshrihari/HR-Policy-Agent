@@ -1,0 +1,164 @@
+{
+  "INTENT_ROUTE_LLM": {
+    "name": "Intent Route LLM",
+    "temperature": 0.75,
+    "max_tokens": 4000,
+    "top_k": 0.5,
+    "model": "ORA_LLM_MODEL_GPT_OSS_120B",
+    "outputSpecification": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"intent\": {\n      \"type\": \"string\",\n      \"enum\": [\"GREETING\", \"POLICY\" , \"REDIRECT\"],\n      \"description\" : \"The classified user Intent.\"\n    },\n    \"tmType\": {\n      \"type\": \"string\",\n      \"enum\": [\"Non Represented\", \"Represented\", \"Tavern\"],\n      \"description\": \"The classified Team Member type.\"\n    },\n     \"language\": {\n      \"type\": \"string\",\n      \"enum\": [\"EN\", \"ES\"],\n      \"description\": \"The detected user language.\"\n    }\n\n  \"required\": [\n    \"intent\",\n    \"tmType\",\n    \"language\"\n  ]\n}",
+    "outcome_success": "1782996684716"
+  },
+  "INPUT_USER_QUERY": {
+    "name": "Input User Query",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"searchQuery\": {\n      \"type\": \"string\"\n    },\n    \"preservedConstraints\": {\n      \"type\": \"string\"\n    },\n  },\n  \"required\": [\n    \"searchQuery\",\n    \"preservedConstraints\"\n  ],\n  \"additionalProperties\": false\n}",
+    "outcome_success": "1773670303628"
+  },
+  "REDIRECT_LLM": {
+    "name": "Redirect LLM",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1773670338568"
+  },
+  "GET_NEGATIVE_FEEDBACK_DETAILS": {
+    "name": "Get Negative Feedback Details",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1783314930976"
+  },
+  "NEGATIVE_FEEDBACK_INPUT_CHECK": {
+    "name": "Negative Feedback Input Check",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1783315092825"
+  },
+  "NEGATIVE_FEEDBACK_LLM": {
+    "name": "Negative Feedback LLM",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1784176809688"
+  },
+  "ANSWER_AGENT_": {
+    "name": "Answer agent",
+    "temperature": 0.3,
+    "max_tokens": 4000,
+    "top_k": 0.1,
+    "model": "ORA_LLM_MODEL_GPT_OSS_120B",
+    "outputSpecification": null,
+    "outcome_success": "1786963491397"
+  },
+  "REDIRECT_LLM_SPANISH": {
+    "name": "Redirect LLM Spanish",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1782902003438"
+  },
+  "GET_NEGATIVE_FEEDBACK_DETAILS_SPANISH": {
+    "name": "Get Negative Feedback Details (Spanish)",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1782907349560"
+  },
+  "NEGATIVE_FEEDBACK_INPUT_CHECK_SPANISH": {
+    "name": "Negative Feedback Input Check (Spanish)",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1783317894896"
+  },
+  "NEGATIVE_FEEDBACK_LLM_SPANISH": {
+    "name": "Negative Feedback LLM (Spanish)",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1782908036889"
+  },
+  "GET_THE_RELEVANT_CITATION_ONLY": {
+    "name": "Get the Relevant Citation only",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"Document_Title\": {\n      \"type\": \"array\",\n      \"description\": \"Titles of the source documents for the relevant citations, most relevant first. Document_Title[i] MUST correspond to Citation_Details[i]. Empty array [] when no relevant citations exist or intent is not POLICY.\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"Citation_Details\": {\n      \"type\": \"array\",\n      \"description\": \"Verbatim citation text copied exactly from the source, most relevant first. Same length and order as Document_Title. Empty array [] when no relevant citations exist or intent is not POLICY.\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    }\n  },\n  \"required\": [\n    \"Document_Title\",\n    \"Citation_Details\"\n  ]\n}",
+    "outcome_success": "1783833250252"
+  },
+  "GET_THE_RELEVANT_CITATION_ONLY_SPANISH": {
+    "name": "Get the Relevant Citation only (Spanish)",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1784019595227"
+  },
+  "ANSWER_AGENT_SPANISH": {
+    "name": "Answer Agent Spanish",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1786974832604"
+  },
+  "CREATE_UNIQUE_QUERY": {
+    "name": "Create Unique Query",
+    "temperature": 0.75,
+    "max_tokens": 32000,
+    "top_k": 0,
+    "model": "OPEN_AI_GPT_4_1_MINI",
+    "outputSpecification": null,
+    "outcome_success": "1785484010131"
+  },
+  "CREATE_UNIQUE_QUERY_SPANISH": {
+    "name": "Create Unique Query Spanish",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1785508548150"
+  },
+  "FINAL_ANWER_GENERATOR": {
+    "name": "Final Anwer Generator",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": "",
+    "outcome_success": "1786967896370"
+  },
+  "FINAL_ANWER_GENERATOR_SPANISH": {
+    "name": "Final Answer Generator (Spanish)",
+    "temperature": null,
+    "max_tokens": null,
+    "top_k": null,
+    "model": null,
+    "outputSpecification": null,
+    "outcome_success": "1786975180752"
+  }
+}
