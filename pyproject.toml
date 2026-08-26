@@ -23,8 +23,10 @@ rest = ["requests>=2.31"]
 rag = ["scikit-learn>=1.3", "numpy>=1.24"]
 # Read PDF / Word handbooks (torch-free).
 docs = ["pypdf>=4.0", "docx2txt>=0.8"]
-# Persistent vector database with embeddings (torch-free with the openai provider).
+# Persistent vector database with embeddings (torch-free with the openai/ollama providers).
 vectordb = ["langchain-chroma>=0.1.4", "langchain-openai>=0.2.0", "pypdf>=4.0", "docx2txt>=0.8"]
+# Fully local, torch-free embeddings + chat via an Ollama server.
+vectordb-ollama = ["langchain-chroma>=0.1.4", "langchain-ollama>=0.2.0", "pypdf>=4.0", "docx2txt>=0.8"]
 # Optional heavier semantic RAG (large download; may hit Windows path limits).
 rag-semantic = ["langchain-community>=0.3.0", "faiss-cpu>=1.8", "sentence-transformers>=3.0", "langchain-huggingface>=0.1.0"]
 

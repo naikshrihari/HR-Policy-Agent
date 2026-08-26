@@ -130,11 +130,36 @@ similarity; the top chunks feed the answer + citation cards. If a collection is 
 
 **Embedding provider options** (`HRPA_EMBEDDING_PROVIDER`):
 
-| Value | Model | Notes |
+| Value | Default model | Notes |
 |---|---|---|
-| `openai` | `text-embedding-3-small` | **Recommended.** Torch-free, needs an API key. |
+| `ollama` | `nomic-embed-text` | **Local & private**, torch-free, no API key — needs a running Ollama server. |
+| `openai` | `text-embedding-3-small` | Torch-free, high quality, needs an API key. |
 | `huggingface` | `all-MiniLM-L6-v2` | Local/offline, but pulls in `torch` (`pip install '.[rag-semantic]'`). |
 | `fake` | deterministic hash | No deps — for offline demos/tests only, not real semantics. |
+
+#### Using Ollama for embeddings (fully local)
+
+[Install Ollama](https://ollama.com), pull an embedding model, then ingest and serve with
+the `ollama` provider — nothing leaves your machine and no API key is needed:
+
+```bash
+ollama pull nomic-embed-text            # or: mxbai-embed-large
+
+pip install '.[vectordb-ollama]'
+export HRPA_EMBEDDING_PROVIDER=ollama
+export HRPA_EMBEDDING_MODEL=nomic-embed-text          # optional; this is the default
+export HRPA_OLLAMA_BASE_URL=http://localhost:11434    # optional; this is the default
+
+python -m scripts.ingest                # embed data/corpus/... into data/chroma/
+
+export HRPA_USE_MOCK_RAG=false
+export HRPA_RAG_BACKEND=chroma
+python -m hr_policy_agent.cli "How much bereavement leave do I get?"
+```
+
+You can also run the **chat model** locally on the same server:
+`HRPA_LLM_PROVIDER=ollama` with `HRPA_LLM_MODEL=llama3.1` (or any model you've pulled).
+The embedding provider used at query time must match the one used during ingest.
 
 > **Windows tip:** the `openai` embedding provider and the TF-IDF backend are both
 > torch-free, so they avoid the `WinError 206` long-path failure that `torch` triggers.

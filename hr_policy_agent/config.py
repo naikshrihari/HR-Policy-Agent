@@ -62,6 +62,8 @@ class Settings:
     # ----- Embeddings (Chroma backend) ----------------------------------------
     embedding_provider: str = field(default_factory=lambda: os.getenv("HRPA_EMBEDDING_PROVIDER", "openai"))
     embedding_model: str = field(default_factory=lambda: os.getenv("HRPA_EMBEDDING_MODEL", "text-embedding-3-small"))
+    # Local Ollama server (used by the "ollama" LLM and embedding providers).
+    ollama_base_url: str = field(default_factory=lambda: os.getenv("HRPA_OLLAMA_BASE_URL", "http://localhost:11434"))
 
     # ----- Human-in-the-loop feedback -----------------------------------------
     # When False the feedback branch is auto-resolved (treated as APPROVED) so the

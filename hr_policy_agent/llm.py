@@ -46,7 +46,7 @@ def get_chat_model(settings: Settings, temperature: Optional[float] = None,
     if provider == "ollama":
         from langchain_ollama import ChatOllama
 
-        return ChatOllama(model=settings.llm_model, temperature=temp)
+        return ChatOllama(model=settings.llm_model, temperature=temp, base_url=settings.ollama_base_url)
 
     raise ValueError(
         f"Unknown LLM provider {settings.llm_provider!r}. Use openai/anthropic/ollama, "

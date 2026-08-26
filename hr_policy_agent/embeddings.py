@@ -2,8 +2,10 @@
 
 Providers (set ``HRPA_EMBEDDING_PROVIDER``):
 
+* ``ollama``      — local Ollama server (e.g. ``nomic-embed-text``). Torch-free, runs
+                    fully offline, no API key. **Recommended for local/private setups.**
 * ``openai``      — ``text-embedding-3-small`` by default. Torch-free, high quality,
-                    needs an API key. **Recommended for Windows.**
+                    needs an API key.
 * ``huggingface`` — local ``all-MiniLM-L6-v2``. Runs offline but pulls in torch.
 * ``fake``        — deterministic hash embedding. No deps, for tests/offline demos only.
 """
@@ -45,6 +47,14 @@ class DeterministicHashEmbeddings:
 def get_embeddings(settings: Settings):
     """Return an embeddings object for the configured provider."""
     provider = settings.embedding_provider.lower()
+    if provider == "ollama":
+        from langchain_ollama import OllamaEmbeddings
+
+        # When left at the OpenAI default, pick a sensible local embedding model.
+        model = settings.embedding_model
+        if model == "text-embedding-3-small":
+            model = "nomic-embed-text"
+        return OllamaEmbeddings(model=model, base_url=settings.ollama_base_url)
     if provider == "openai":
         from langchain_openai import OpenAIEmbeddings
 
