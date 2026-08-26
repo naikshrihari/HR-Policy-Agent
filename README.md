@@ -1,7 +1,7 @@
 # HR Policy Agent (LangChain + LangGraph)
 
 A Python port of the Oracle Fusion AI Agent Studio workflow
-**`HR_POLICY_WORKFLOW_AGENT_V35`** — the *Station Casinos HCM Policy Agent* — rebuilt
+**`HR_POLICY_WORKFLOW_AGENT_V35`** the *Station Casinos HCM Policy Agent* rebuilt
 as a [LangGraph](https://langchain-ai.github.io/langgraph/) state machine with
 [LangChain](https://python.langchain.com/) chat models.
 
