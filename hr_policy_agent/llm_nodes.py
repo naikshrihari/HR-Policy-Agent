@@ -58,7 +58,7 @@ def _rag_context(state: Dict[str, Any], max_chars: int = 4000) -> str:
     return ""
 
 
-def _compact_prompt(code: str, state: Dict[str, Any]) -> str:
+def _compact_prompt(code: str, state: Dict[str, Any], context_chars: int = 5000) -> str:
     """A short, fast prompt for the answer/redirect nodes (used in fast mode)."""
     question = (state.get("nodes", {}).get("INPUT_USER_QUERY") or {}).get(
         "searchQuery", state.get("input_message", ""))
@@ -71,7 +71,7 @@ def _compact_prompt(code: str, state: Dict[str, Any]) -> str:
         return ("You are an HR policy assistant. The user's question is not about an HR policy. "
                 "Politely redirect them in one sentence.\n\n"
                 f"Question: {question}\nAnswer:")
-    context = _rag_context(state, max_chars=2000)
+    context = _rag_context(state, max_chars=context_chars)
     if spanish:
         return ("Eres un asistente de políticas de RR. HH. Usando ÚNICAMENTE el CONTEXTO, responde "
                 "la PREGUNTA de forma concisa (2-4 frases). Si la respuesta no está en el contexto, "
@@ -93,7 +93,7 @@ def run_llm_node(code: str, state: Dict[str, Any], settings: Settings) -> Any:
         return fake_llm(code, state)
 
     if fast:
-        rendered = _compact_prompt(code, state)
+        rendered = _compact_prompt(code, state, context_chars=settings.answer_context_chars)
         temperature, max_tokens = 0.2, 512
     else:
         rendered = render(load_prompt(code), build_context(state))

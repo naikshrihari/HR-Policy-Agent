@@ -129,6 +129,17 @@ python -m hr_policy_agent.cli "How much bereavement leave do I get?"
 
 Documents are loaded, chunked, and indexed in memory at startup. Great to get going.
 
+Debugging retrieval — see exactly which chunks a question pulls (rank + text):
+
+```bash
+python -m scripts.search "can I take photos inside the casino?"
+#   --tm-type REPRESENTED   --language ES   --k 8
+```
+
+If the right chunk is missing entirely, it's a retrieval miss (try the Chroma embeddings
+backend, or a smaller `HRPA_RAG_CHUNK_SIZE`). If it's present but the answer ignored it,
+raise `HRPA_ANSWER_CONTEXT_CHARS` (default 5000) so lower-ranked chunks reach the model.
+
 Retrieval quality notes:
 * Documents are split **section-aware** — each handbook heading (e.g. "Voting Leave")
   starts a new chunk, so a topic is retrieved as a unit rather than blended with its

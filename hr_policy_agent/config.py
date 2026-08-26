@@ -70,6 +70,9 @@ class Settings:
     # Directory that holds the handbook corpora, one sub-folder per tool code.
     rag_corpus_dir: str = field(default_factory=lambda: os.getenv("HRPA_RAG_CORPUS_DIR", "data/corpus"))
     rag_top_k: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_TOP_K", "6")))
+    # How many characters of retrieved context the (fast-mode) answer prompt may use.
+    # Too small truncates lower-ranked chunks before the model sees them.
+    answer_context_chars: int = field(default_factory=lambda: int(os.getenv("HRPA_ANSWER_CONTEXT_CHARS", "5000")))
     use_mock_rag: bool = field(default_factory=lambda: _get_bool("HRPA_USE_MOCK_RAG", True))
     # Retrieval backend when mock RAG is off: "tfidf" (in-memory, scikit-learn) or
     # "chroma" (persistent vector database, requires an embedding model).
