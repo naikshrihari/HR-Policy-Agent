@@ -125,7 +125,7 @@ def build_document_tools(settings: Settings) -> Dict[str, BaseDocumentTool]:
             tools[node_code] = MockDocumentTool(node_code, meta["title"], meta["language"])
             continue
         corpus = os.path.join(settings.rag_corpus_dir, meta["tool"])
-        retriever = _build_retriever(corpus)
+        retriever = _build_retriever(corpus, top_k=settings.rag_top_k)
         if retriever is None:
             tools[node_code] = MockDocumentTool(node_code, meta["title"], meta["language"])
         else:
@@ -135,33 +135,103 @@ def build_document_tools(settings: Settings) -> Dict[str, BaseDocumentTool]:
     return tools
 
 
-def _build_retriever(corpus_dir: str):  # pragma: no cover - optional live path
-    """Build a simple in-memory retriever over .txt/.md files in ``corpus_dir``.
+class _Chunk:
+    """Minimal Document-compatible object (has .page_content and .metadata)."""
 
-    Returns None if the directory is missing or LangChain community deps are absent,
-    in which case the caller falls back to the mock tool.
+    __slots__ = ("page_content", "metadata")
+
+    def __init__(self, page_content: str, metadata: Dict[str, Any]):
+        self.page_content = page_content
+        self.metadata = metadata
+
+
+def _split_text(text: str, chunk_size: int = 1400, overlap: int = 150) -> List[str]:
+    """Paragraph-aware character chunker (no external splitter dependency)."""
+    text = text.replace("\r\n", "\n")
+    paras = [p.strip() for p in text.split("\n\n") if p.strip()]
+    chunks: List[str] = []
+    buf = ""
+    for p in paras:
+        if len(buf) + len(p) + 2 <= chunk_size:
+            buf = f"{buf}\n\n{p}" if buf else p
+        else:
+            if buf:
+                chunks.append(buf)
+            # Long single paragraph: hard-split with overlap.
+            while len(p) > chunk_size:
+                chunks.append(p[:chunk_size])
+                p = p[chunk_size - overlap:]
+            buf = p
+    if buf:
+        chunks.append(buf)
+    return chunks or ([text] if text.strip() else [])
+
+
+def _load_chunks(corpus_dir: str) -> List[_Chunk]:
+    chunks: List[_Chunk] = []
+    for root, _dirs, files in os.walk(corpus_dir):
+        for fn in sorted(files):
+            if not fn.lower().endswith((".txt", ".md")):
+                continue
+            path = os.path.join(root, fn)
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                for piece in _split_text(f.read()):
+                    chunks.append(_Chunk(piece, {"documentTitle": fn}))
+    return chunks
+
+
+class TfidfRetriever:
+    """Lightweight TF-IDF cosine retriever (scikit-learn only — no torch/faiss).
+
+    Exposes ``.invoke(query)`` returning the top matching chunks, so it plugs into
+    :class:`RetrieverDocumentTool` exactly like a LangChain retriever.
+    """
+
+    def __init__(self, chunks: List[_Chunk], top_k: int = 6):
+        from sklearn.feature_extraction.text import TfidfVectorizer
+
+        self.chunks = chunks
+        self.top_k = top_k
+        self._vectorizer = TfidfVectorizer(stop_words=None)
+        self._matrix = self._vectorizer.fit_transform(c.page_content for c in chunks)
+
+    def invoke(self, query: str) -> List[_Chunk]:
+        import numpy as np
+
+        q = self._vectorizer.transform([query])
+        scores = (self._matrix @ q.T).toarray().ravel()
+        order = np.argsort(scores)[::-1]
+        return [self.chunks[i] for i in order[: self.top_k] if scores[i] > 0]
+
+
+def _build_retriever(corpus_dir: str, top_k: int = 6):  # pragma: no cover - optional live path
+    """Build an in-memory retriever over .txt/.md files in ``corpus_dir``.
+
+    Prefers a torch-free scikit-learn TF-IDF retriever; falls back to a FAISS +
+    sentence-transformers retriever only if scikit-learn is unavailable but those are
+    installed.  Returns None if the directory is missing/empty or no backend is
+    available, in which case the caller uses the mock tool.
     """
     if not os.path.isdir(corpus_dir):
         return None
+    chunks = _load_chunks(corpus_dir)
+    if not chunks:
+        return None
+
+    # Preferred: lightweight TF-IDF (scikit-learn only).
+    try:
+        import sklearn  # noqa: F401
+        return TfidfRetriever(chunks, top_k=top_k)
+    except ImportError:
+        pass
+
+    # Optional heavier path: FAISS + HuggingFace embeddings.
     try:
         from langchain_community.vectorstores import FAISS
         from langchain_community.embeddings import HuggingFaceEmbeddings
-        from langchain_text_splitters import RecursiveCharacterTextSplitter
         from langchain_core.documents import Document
     except ImportError:
         return None
-
-    docs = []
-    for root, _dirs, files in os.walk(corpus_dir):
-        for fn in files:
-            if fn.lower().endswith((".txt", ".md")):
-                path = os.path.join(root, fn)
-                with open(path, encoding="utf-8", errors="ignore") as f:
-                    docs.append(Document(page_content=f.read(), metadata={"documentTitle": fn}))
-    if not docs:
-        return None
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1400, chunk_overlap=150)
-    splits = splitter.split_documents(docs)
+    docs = [Document(page_content=c.page_content, metadata=c.metadata) for c in chunks]
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    store = FAISS.from_documents(splits, embeddings)
-    return store.as_retriever()
+    return FAISS.from_documents(docs, embeddings).as_retriever()

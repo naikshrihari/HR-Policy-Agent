@@ -66,9 +66,33 @@ Configuration is entirely environment-driven (see `hr_policy_agent/config.py`):
 | `HRPA_ENABLE_HUMAN_FEEDBACK` | enable the feedback loop | `false` |
 
 With `HRPA_LLM_PROVIDER` set to a real provider, the verbatim prompts in
-`hr_policy_agent/prompts/` are rendered and sent to the model. To run real RAG, drop
-handbook text/markdown files under `HRPA_RAG_CORPUS_DIR/<tool-code>/` and
-`pip install '.[rag]'`.
+`hr_policy_agent/prompts/` are rendered and sent to the model.
+
+### Real RAG over your handbooks
+
+Drop handbook `.txt` / `.md` files into a per-tool sub-folder of the corpus directory:
+
+```
+data/corpus/
+  TAVERN_ENGLISH_DOCUMENT_TOOL_WORKFLOW_V3/      # Tavern handbook (EN)
+  REP_ENGLISH_DOCUMENT_TOOL_WORKFLOW_V3/         # Represented handbook (EN)
+  NON_REP_ENGLISH_DOCUMENT_TOOL_WORKFLOW_V3/     # Non-Represented handbook (EN)
+  REP_SPANISH_DOCUMENT_TOOL_WORKFLOW/            # Represented handbook (ES)
+  NON_REP_SPANISH_DOCUMENT_TOOL_WORKFLOW_V3/     # Non-Represented handbook (ES)
+```
+
+Then enable it:
+
+```bash
+pip install '.[rag]'            # lightweight: scikit-learn TF-IDF (no torch)
+export HRPA_USE_MOCK_RAG=false
+export HRPA_RAG_CORPUS_DIR=data/corpus
+```
+
+The default retriever is a torch-free scikit-learn TF-IDF search, which avoids the huge
+`torch` download (and the Windows 260-char path errors it can cause). For semantic
+embeddings instead, `pip install '.[rag-semantic]'` (FAISS + sentence-transformers) —
+larger, and best run from a short path such as `C:\dev\HR-Policy-Agent`.
 
 ## How the Oracle workflow maps to this project
 
