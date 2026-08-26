@@ -60,15 +60,24 @@ def main(argv=None) -> int:
         settings.fast_mode = True
     if args.timings:
         settings.timing = True
-    agent = HRPolicyAgent(settings)
     if not args.quiet:
-        print(f"[HR Policy Agent] LLM provider: {settings.llm_provider} | "
-              f"fast={settings.fast_mode} | mock HCM={settings.use_mock_hcm} RAG={settings.use_mock_rag}\n")
+        model = f" ({settings.llm_model})" if settings.llm_provider != "fake" else ""
+        print(f"[HR Policy Agent] LLM provider: {settings.llm_provider}{model} | "
+              f"fast={settings.fast_mode} | mock HCM={settings.use_mock_hcm} RAG={settings.use_mock_rag}")
+        _ollama_preflight(settings)
+        print()
+    agent = HRPolicyAgent(settings)
 
     render = (lambda x: x) if args.html else html_to_text
 
+    def answer_with_progress(msg: str, cid=None):
+        if settings.llm_provider != "fake" and not args.quiet:
+            print("Thinking… (the first call also loads the model into memory)", flush=True)
+        return agent.run(msg, person_number=args.person_number, conversation_id=cid)
+
     if args.message:
-        print(render(agent.answer(" ".join(args.message), person_number=args.person_number)))
+        state = answer_with_progress(" ".join(args.message))
+        print(render(state.get("final_response", "")))
         return 0
 
     if not args.quiet:
@@ -84,10 +93,37 @@ def main(argv=None) -> int:
             break
         if not msg:
             continue
-        state = agent.run(msg, person_number=args.person_number, conversation_id=conversation_id)
+        state = answer_with_progress(msg, conversation_id)
         conversation_id = state.get("conversation_id")
         print("\nagent>", render(state.get("final_response", "")), "\n")
     return 0
+
+
+def _ollama_preflight(settings) -> None:
+    """When using Ollama, warn early if the server is down or the model isn't pulled,
+    instead of hanging silently for minutes."""
+    if settings.llm_provider.lower() != "ollama":
+        return
+    import json
+    import urllib.request
+
+    url = settings.ollama_base_url.rstrip("/") + "/api/tags"
+    try:
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            data = json.load(resp)
+    except Exception as exc:  # noqa: BLE001 - best-effort diagnostic
+        print(f"  [warn] Can't reach Ollama at {settings.ollama_base_url} ({exc}).")
+        print("         Start it with 'ollama serve' (or check HRPA_OLLAMA_BASE_URL).")
+        return
+    models = [m.get("name", "") for m in data.get("models", [])]
+    want = settings.llm_model
+    base = want.split(":")[0]
+    if not any(m == want or m.split(":")[0] == base for m in models):
+        print(f"  [warn] Model '{want}' is not pulled in Ollama — the first call will "
+              "download it (can be slow / look frozen).")
+        print(f"         Pull it now with:  ollama pull {want}")
+        if models:
+            print(f"         Installed models: {', '.join(models)}")
 
 
 if __name__ == "__main__":

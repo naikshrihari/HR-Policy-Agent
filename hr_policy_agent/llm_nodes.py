@@ -71,7 +71,7 @@ def _compact_prompt(code: str, state: Dict[str, Any]) -> str:
         return ("You are an HR policy assistant. The user's question is not about an HR policy. "
                 "Politely redirect them in one sentence.\n\n"
                 f"Question: {question}\nAnswer:")
-    context = _rag_context(state)
+    context = _rag_context(state, max_chars=2000)
     if spanish:
         return ("Eres un asistente de políticas de RR. HH. Usando ÚNICAMENTE el CONTEXTO, responde "
                 "la PREGUNTA de forma concisa (2-4 frases). Si la respuesta no está en el contexto, "
