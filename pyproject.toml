@@ -20,6 +20,7 @@ openai = ["langchain-openai>=0.2.0"]
 anthropic = ["langchain-anthropic>=0.2.0"]
 ollama = ["langchain-ollama>=0.2.0"]
 rest = ["requests>=2.31"]
+web = ["fastapi>=0.110", "uvicorn>=0.27"]
 # Lightweight, torch-free RAG (recommended): scikit-learn TF-IDF retrieval.
 rag = ["scikit-learn>=1.3", "numpy>=1.24"]
 # Read PDF / Word handbooks (torch-free).
@@ -33,6 +34,7 @@ rag-semantic = ["langchain-community>=0.3.0", "faiss-cpu>=1.8", "sentence-transf
 
 [project.scripts]
 hr-policy-agent = "hr_policy_agent.cli:main"
+hr-policy-agent-web = "hr_policy_agent.web:main"
 
 [tool.setuptools.packages.find]
 include = ["hr_policy_agent*"]

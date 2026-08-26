@@ -43,6 +43,21 @@ python -m hr_policy_agent.cli "How many PL days do I accrue?"
 python -m hr_policy_agent.cli
 ```
 
+## Web UI (for end users)
+
+A browser chat page is included — the friendliest way to use the agent:
+
+```bash
+pip install '.[web]'
+python -m hr_policy_agent.web        # then open http://localhost:8000
+#   options: --host 0.0.0.0 --port 8080   (share on your network)
+```
+
+It reads the same `.env` configuration as the CLI (LLM provider, RAG backend, etc.),
+renders the answer with its citation cards, keeps conversation context, and shows the
+active provider/model in the header. Endpoints: `GET /` (page), `POST /api/ask`
+(`{message, conversation_id?}` → `{response, language, conversation_id}`), `GET /api/config`.
+
 ```python
 from hr_policy_agent import HRPolicyAgent
 
