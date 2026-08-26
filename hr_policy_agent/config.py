@@ -13,6 +13,16 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
+# Load a project-root .env file (if present) so settings persist across shells and you
+# don't have to re-export environment variables in every terminal. Real environment
+# variables still win over .env values.
+try:  # pragma: no cover - convenience only
+    from dotenv import load_dotenv
+
+    load_dotenv(override=False)
+except ImportError:  # python-dotenv not installed → just use real env vars
+    pass
+
 
 def _get_bool(name: str, default: bool) -> bool:
     val = os.getenv(name)

@@ -53,6 +53,25 @@ print(agent.answer("Where can I see my pay stub?"))         # → ADP referral
 
 ## Using a real LLM / real backends
 
+> **The startup banner tells you what's active**, e.g.
+> `LLM provider: ollama | fast=True | mock HCM=True RAG=False`. If it says
+> `provider: fake` your answers are echoed retrieved text (not written), and if it says
+> `RAG=True` a **mock retriever returns the same canned passage for every question** —
+> set `HRPA_LLM_PROVIDER` and `HRPA_USE_MOCK_RAG=false` to fix both.
+
+**Settings persist via a `.env` file** — copy `.env.example` to `.env` in the project
+root and edit it once, instead of re-exporting environment variables in every terminal
+(PowerShell `$env:` vars don't survive a new window). Real environment variables still
+override `.env`. A minimal working `.env` for local Ollama + your own docs:
+
+```ini
+HRPA_LLM_PROVIDER=ollama
+HRPA_LLM_MODEL=llama3.2:3b
+HRPA_FAST_MODE=true
+HRPA_USE_MOCK_RAG=false
+HRPA_RAG_CORPUS_DIR=data/corpus
+```
+
 Configuration is entirely environment-driven (see `hr_policy_agent/config.py`):
 
 | Variable | Purpose | Default |
