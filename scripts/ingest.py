@@ -52,9 +52,13 @@ def main(argv=None) -> int:
         print("Chroma is not installed. Run:  pip install '.[vectordb]'", file=sys.stderr)
         return 1
 
-    embeddings = get_embeddings(settings)
     print(f"Embedding provider: {settings.embedding_provider} ({settings.embedding_model})")
     print(f"Corpus:  {corpus_dir}\nChroma:  {chroma_dir}\n")
+    try:
+        embeddings = get_embeddings(settings)
+    except ImportError as exc:
+        print(exc, file=sys.stderr)
+        return 1
 
     total = 0
     # One collection per handbook tool; a folder is named for the Oracle tool code.

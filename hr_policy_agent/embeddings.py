@@ -44,29 +44,43 @@ class DeterministicHashEmbeddings:
         return self._embed(text)
 
 
+def _require(module: str, provider: str, extra: str):
+    """Import ``module`` or raise a clear, actionable error naming the pip extra."""
+    import importlib
+
+    try:
+        return importlib.import_module(module)
+    except ImportError as exc:
+        raise ImportError(
+            f"Embedding provider '{provider}' needs the '{module}' package, which isn't "
+            f"installed.\n  Install it with:  pip install '.[{extra}]'\n"
+            f"  (or change HRPA_EMBEDDING_PROVIDER in your .env to a provider you have.)"
+        ) from exc
+
+
 def get_embeddings(settings: Settings):
     """Return an embeddings object for the configured provider."""
     provider = settings.embedding_provider.lower()
     if provider == "ollama":
-        from langchain_ollama import OllamaEmbeddings
-
+        mod = _require("langchain_ollama", "ollama", "vectordb-ollama")
         # When left at the OpenAI default, pick a sensible local embedding model.
         model = settings.embedding_model
         if model == "text-embedding-3-small":
             model = "nomic-embed-text"
-        return OllamaEmbeddings(model=model, base_url=settings.ollama_base_url)
+        return mod.OllamaEmbeddings(model=model, base_url=settings.ollama_base_url)
     if provider == "openai":
-        from langchain_openai import OpenAIEmbeddings
-
-        return OpenAIEmbeddings(
+        mod = _require("langchain_openai", "openai", "vectordb")
+        return mod.OpenAIEmbeddings(
             model=settings.embedding_model,
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
         )
     if provider == "huggingface":
-        from langchain_huggingface import HuggingFaceEmbeddings
-
-        return HuggingFaceEmbeddings(model_name=settings.embedding_model)
+        mod = _require("langchain_huggingface", "huggingface", "rag-semantic")
+        return mod.HuggingFaceEmbeddings(model_name=settings.embedding_model)
     if provider == "fake":
         return DeterministicHashEmbeddings()
-    raise ValueError(f"Unknown embedding provider {settings.embedding_provider!r}")
+    raise ValueError(
+        f"Unknown embedding provider {settings.embedding_provider!r}. "
+        "Set HRPA_EMBEDDING_PROVIDER to one of: ollama, openai, huggingface, fake."
+    )
