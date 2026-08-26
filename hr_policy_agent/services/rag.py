@@ -212,12 +212,59 @@ def _looks_like_heading(p: str) -> bool:
     return caps >= max(1, len(words) - 1)
 
 
+def _split_on_boundaries(text: str, chunk_size: int, overlap: int) -> List[str]:
+    """Split a long paragraph on sentence, then word boundaries — never mid-word.
+
+    Sentences are packed up to ``chunk_size``; consecutive chunks share ``overlap``
+    characters of trailing words for context continuity.
+    """
+    sentences = _re.split(r"(?<=[.!?])\s+", text.strip())
+    pieces: List[str] = []
+    buf = ""
+    for s in sentences:
+        s = s.strip()
+        if not s:
+            continue
+        if len(s) > chunk_size:  # a single very long sentence → split on words
+            words = s.split()
+            cur = ""
+            for w in words:
+                if len(cur) + len(w) + 1 > chunk_size and cur:
+                    pieces.append(cur.strip())
+                    cur = ""
+                cur = f"{cur} {w}".strip()
+            if cur:
+                pieces.append(cur.strip())
+            buf = ""
+            continue
+        if len(buf) + len(s) + 1 > chunk_size and buf:
+            pieces.append(buf.strip())
+            buf = ""
+        buf = f"{buf} {s}".strip()
+    if buf.strip():
+        pieces.append(buf.strip())
+
+    if overlap <= 0 or len(pieces) < 2:
+        return pieces
+    # Add word-boundary overlap: prepend the tail of the previous chunk.
+    out = [pieces[0]]
+    for prev, cur in zip(pieces, pieces[1:]):
+        tail_words = prev.split()
+        tail = ""
+        for w in reversed(tail_words):
+            if len(tail) + len(w) + 1 > overlap:
+                break
+            tail = f"{w} {tail}".strip()
+        out.append((tail + " " + cur).strip() if tail else cur)
+    return out
+
+
 def _split_text(text: str, chunk_size: int = 900, overlap: int = 150) -> List[str]:
-    """Section-aware paragraph chunker (no external splitter dependency).
+    """Section-aware, word-safe paragraph chunker (no external splitter dependency).
 
     Paragraphs are grouped into chunks, but a heading paragraph forces a new chunk so
     each handbook section stays together and is retrieved as a unit. Oversized sections
-    are hard-split with overlap.
+    are split on sentence/word boundaries (never mid-word).
     """
     text = text.replace("\r\n", "\n")
     paras = [p.strip() for p in text.split("\n\n") if p.strip()]
@@ -239,10 +286,7 @@ def _split_text(text: str, chunk_size: int = 900, overlap: int = 150) -> List[st
             flush()
         if len(p) > chunk_size:
             flush()
-            start = 0
-            while start < len(p):
-                chunks.append(p[start:start + chunk_size])
-                start += chunk_size - overlap
+            chunks.extend(_split_on_boundaries(p, chunk_size, overlap))
             continue
         buf = f"{buf}\n\n{p}" if buf else p
     flush()

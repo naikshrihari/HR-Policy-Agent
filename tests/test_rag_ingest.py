@@ -96,3 +96,28 @@ def test_section_aware_chunking_and_short_query_retrieval(tmp_path):
     for query in ("can i take voting leave?", "voting booth is 3 miles away, how much leave can I take?"):
         top = retriever.invoke(query)[0].page_content
         assert "Voting Leave" in top, f"{query!r} retrieved: {top[:40]!r}"
+
+
+def test_clean_pdf_text_dehyphenates_and_strips_furniture():
+    from hr_policy_agent.services.loaders import clean_pdf_text
+    raw = ("EMPLOYMENT POLICIES 53\n"
+           "Team Members must follow all si-\ngns and speed limits when walking thr-\n"
+           "ough the parking areas.\n\n"
+           "Photography Policy\n"
+           "No photographs may be taken inside the casino.\n")
+    cleaned = clean_pdf_text(raw)
+    assert "signs" in cleaned and "through" in cleaned      # de-hyphenated
+    assert "si-" not in cleaned and "thr-" not in cleaned
+    assert "EMPLOYMENT POLICIES 53" not in cleaned          # page furniture removed
+    assert "Photography Policy" in cleaned
+
+
+def test_word_safe_chunking_never_splits_mid_word():
+    from hr_policy_agent.services.rag import _split_text
+    para = " ".join(f"sentence{i} has several words here." for i in range(60))
+    chunks = _split_text(para, 300, 50)
+    assert len(chunks) > 1
+    # every chunk starts and ends on a whole word (no leading/trailing partial token)
+    for c in chunks:
+        assert not c.startswith(" ") and "  " not in c
+        assert c.split()[0].isascii()
