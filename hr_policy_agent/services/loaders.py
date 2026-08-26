@@ -7,8 +7,13 @@ install.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import List, Tuple
+
+# pypdf logs a noisy "Ignoring wrong pointing object …" warning for minor structural
+# quirks in many PDFs; extraction still works, so keep the console clean.
+logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 SUPPORTED_EXTENSIONS = (".txt", ".md", ".pdf", ".docx")
 
