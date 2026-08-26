@@ -186,26 +186,67 @@ class _Chunk:
         self.metadata = metadata
 
 
-def _split_text(text: str, chunk_size: int = 1400, overlap: int = 150) -> List[str]:
-    """Paragraph-aware character chunker (no external splitter dependency)."""
+import re as _re
+
+# A "heading" paragraph: a short single line that names a section (e.g. "Voting Leave",
+# "BEREAVEMENT", "3. Pay Dates"). Headings start a new chunk so each policy topic is its
+# own retrievable unit instead of being merged into one big block.
+_HEADING_RE = _re.compile(r"^[#\s]*[0-9A-Za-z][^\n]{0,68}$")
+
+
+def _looks_like_heading(p: str) -> bool:
+    if "\n" in p:
+        return False
+    s = p.strip().lstrip("#").strip()
+    if not s or len(s) > 70 or s.endswith((".", ":", ";", ",", "?", "!")):
+        return False
+    words = s.split()
+    if len(words) > 9:
+        return False
+    # Title Case, ALL CAPS, a numbered heading, or a markdown "#" heading.
+    if p.lstrip().startswith("#"):
+        return True
+    if s.isupper():
+        return True
+    caps = sum(1 for w in words if w[:1].isupper())
+    return caps >= max(1, len(words) - 1)
+
+
+def _split_text(text: str, chunk_size: int = 900, overlap: int = 150) -> List[str]:
+    """Section-aware paragraph chunker (no external splitter dependency).
+
+    Paragraphs are grouped into chunks, but a heading paragraph forces a new chunk so
+    each handbook section stays together and is retrieved as a unit. Oversized sections
+    are hard-split with overlap.
+    """
     text = text.replace("\r\n", "\n")
     paras = [p.strip() for p in text.split("\n\n") if p.strip()]
     chunks: List[str] = []
     buf = ""
+
+    def flush():
+        nonlocal buf
+        if buf.strip():
+            chunks.append(buf.strip())
+        buf = ""
+
     for p in paras:
-        if len(buf) + len(p) + 2 <= chunk_size:
-            buf = f"{buf}\n\n{p}" if buf else p
-        else:
-            if buf:
-                chunks.append(buf)
-            # Long single paragraph: hard-split with overlap.
-            while len(p) > chunk_size:
-                chunks.append(p[:chunk_size])
-                p = p[chunk_size - overlap:]
-            buf = p
-    if buf:
-        chunks.append(buf)
-    return chunks or ([text] if text.strip() else [])
+        is_heading = _looks_like_heading(p)
+        # Start a fresh chunk at a heading (unless the buffer is just the previous heading).
+        if is_heading and buf and not _looks_like_heading(buf.strip().split("\n\n")[-1]):
+            flush()
+        if len(buf) + len(p) + 2 > chunk_size and buf:
+            flush()
+        if len(p) > chunk_size:
+            flush()
+            start = 0
+            while start < len(p):
+                chunks.append(p[start:start + chunk_size])
+                start += chunk_size - overlap
+            continue
+        buf = f"{buf}\n\n{p}" if buf else p
+    flush()
+    return chunks or ([text.strip()] if text.strip() else [])
 
 
 def load_chunks(corpus_dir: str, chunk_size: int = 1400, overlap: int = 150) -> List[_Chunk]:
@@ -236,7 +277,11 @@ class TfidfRetriever:
 
         self.chunks = chunks
         self.top_k = top_k
-        self._vectorizer = TfidfVectorizer(stop_words=None)
+        # english stopwords drop "can/i/take/how/much" noise so topic words dominate;
+        # (1,2)-grams let a phrase like "voting leave" match as a unit; sublinear_tf
+        # dampens repeated common terms.
+        self._vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2),
+                                           sublinear_tf=True)
         self._matrix = self._vectorizer.fit_transform(c.page_content for c in chunks)
 
     def invoke(self, query: str) -> List[_Chunk]:

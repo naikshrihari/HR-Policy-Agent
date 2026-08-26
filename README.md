@@ -129,6 +129,15 @@ python -m hr_policy_agent.cli "How much bereavement leave do I get?"
 
 Documents are loaded, chunked, and indexed in memory at startup. Great to get going.
 
+Retrieval quality notes:
+* Documents are split **section-aware** — each handbook heading (e.g. "Voting Leave")
+  starts a new chunk, so a topic is retrieved as a unit rather than blended with its
+  neighbours. Tune with `HRPA_RAG_CHUNK_SIZE` (default 900) / `HRPA_RAG_CHUNK_OVERLAP`.
+* TF-IDF is **keyword** search: a short query like "can I take voting leave?" works, but
+  paraphrases that share no words with the handbook can miss. For robust semantic
+  matching (understands intent, not just words), use the Chroma + embeddings backend
+  below.
+
 #### 2. Embeddings + Chroma vector database (semantic search, persistent)
 
 **Step 1 — embed your PDFs/DOCX into the vector DB** (run once, and whenever docs change):

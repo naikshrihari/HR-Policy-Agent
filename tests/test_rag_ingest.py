@@ -70,3 +70,29 @@ def test_chroma_ingest_and_retrieve(tmp_path):
     assert retriever is not None
     docs = retriever.invoke("How many bereavement days?")
     assert any("Bereavement" in d.page_content for d in docs)
+
+
+def test_section_aware_chunking_and_short_query_retrieval(tmp_path):
+    """Regression: 'can i take voting leave?' must retrieve the Voting section, not
+    whatever shares the most keywords."""
+    folder = tmp_path / "TOOL"
+    folder.mkdir()
+    (folder / "hb.txt").write_text(
+        "Personal Leave (PL) Accrual\n\n"
+        "Eligible Team Members accrue Personal Leave based on length of service.\n\n"
+        "Bereavement Leave\n\n"
+        "Team Members are eligible for up to three (3) days of paid bereavement leave.\n\n"
+        "Voting Leave\n\n"
+        "Team Members may take paid time off to vote, generally up to two (2) hours, and "
+        "more time if the polling place is far from the workplace.\n\n"
+        "Jury Duty Leave\n\n"
+        "Team Members summoned for jury duty are granted leave for the service.\n",
+        encoding="utf-8",
+    )
+    chunks = rag.load_chunks(str(folder), 900, 150)
+    assert len(chunks) >= 4  # one chunk per section
+
+    retriever = rag._build_retriever(str(folder), rag.Settings(rag_top_k=1, rag_chunk_size=900))
+    for query in ("can i take voting leave?", "voting booth is 3 miles away, how much leave can I take?"):
+        top = retriever.invoke(query)[0].page_content
+        assert "Voting Leave" in top, f"{query!r} retrieved: {top[:40]!r}"
