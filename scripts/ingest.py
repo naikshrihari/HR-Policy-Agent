@@ -68,10 +68,28 @@ def main(argv=None) -> int:
         if not os.path.isdir(folder):
             print(f"  · {tool}: no folder, skipped")
             continue
+        # Per-file diagnostics so you can confirm the whole document was read (a
+        # scanned/image PDF extracts little or no text and needs OCR).
+        from hr_policy_agent.services.loaders import iter_corpus_files, load_file_text
+
+        files = iter_corpus_files(folder)
+        file_chars = []
+        for path, fn in files:
+            try:
+                n = len(load_file_text(path))
+            except Exception as exc:  # noqa: BLE001
+                print(f"      ! {fn}: could not read ({exc})")
+                n = 0
+            file_chars.append((fn, n))
+            flag = "  ← very little text; is this a scanned/image PDF? (needs OCR)" if n < 200 else ""
+            print(f"      · {fn}: {n:,} chars{flag}")
+
         chunks = load_chunks(folder, settings.rag_chunk_size, settings.rag_chunk_overlap)
         if not chunks:
             print(f"  · {tool}: no documents, skipped")
             continue
+        total_chars = sum(n for _, n in file_chars)
+        avg = total_chars // max(1, len(chunks))
 
         store = Chroma(collection_name=tool, persist_directory=chroma_dir,
                        embedding_function=embeddings)
@@ -86,9 +104,13 @@ def main(argv=None) -> int:
         docs = [Document(page_content=c.page_content, metadata=c.metadata) for c in chunks]
         store.add_documents(docs)
         total += len(docs)
-        print(f"  ✓ {tool}: embedded {len(docs)} chunks")
+        print(f"  ✓ {tool}: {len(files)} file(s), {total_chars:,} chars → "
+              f"{len(docs)} chunks (~{avg} chars each)")
 
     print(f"\nDone. {total} chunks stored in {chroma_dir}.")
+    print("Note: chunk count ≈ total characters ÷ (chunk_size − overlap). "
+          f"Current chunk_size={settings.rag_chunk_size}, overlap={settings.rag_chunk_overlap} "
+          "(set HRPA_RAG_CHUNK_SIZE / HRPA_RAG_CHUNK_OVERLAP to change).")
     return 0
 
 
