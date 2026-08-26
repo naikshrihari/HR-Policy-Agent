@@ -39,6 +39,8 @@ def main(argv=None) -> int:
     parser.add_argument("--corpus-dir", help="Corpus directory (default from HRPA_RAG_CORPUS_DIR)")
     parser.add_argument("--chroma-dir", help="Chroma persist directory (default from HRPA_CHROMA_DIR)")
     parser.add_argument("--reset", action="store_true", help="Delete each collection before ingesting")
+    parser.add_argument("--batch-size", type=int, default=32,
+                        help="Chunks embedded per request (lower = gentler on a local embedding server)")
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -102,7 +104,7 @@ def main(argv=None) -> int:
                            embedding_function=embeddings)
 
         docs = [Document(page_content=c.page_content, metadata=c.metadata) for c in chunks]
-        store.add_documents(docs)
+        _add_in_batches(store, docs, args.batch_size)
         total += len(docs)
         print(f"  ✓ {tool}: {len(files)} file(s), {total_chars:,} chars → "
               f"{len(docs)} chunks (~{avg} chars each)")
@@ -112,6 +114,34 @@ def main(argv=None) -> int:
           f"Current chunk_size={settings.rag_chunk_size}, overlap={settings.rag_chunk_overlap} "
           "(set HRPA_RAG_CHUNK_SIZE / HRPA_RAG_CHUNK_OVERLAP to change).")
     return 0
+
+
+def _add_in_batches(store, docs, batch_size: int, retries: int = 4) -> None:
+    """Embed + store documents in small batches with retry.
+
+    Sending hundreds of chunks to a local embedding server (Ollama) in one call can make
+    its model runner drop the connection ("actively refused" / tokenize errors). Batching
+    keeps each request small; transient failures are retried with backoff.
+    """
+    import time
+
+    for start in range(0, len(docs), batch_size):
+        batch = docs[start:start + batch_size]
+        for attempt in range(retries):
+            try:
+                store.add_documents(batch)
+                break
+            except Exception as exc:  # noqa: BLE001 - retry transient embedding/server errors
+                if attempt == retries - 1:
+                    print(f"      ! batch {start}-{start + len(batch)} failed after "
+                          f"{retries} tries: {exc}", file=sys.stderr)
+                    print("        Is 'ollama serve' running and the embedding model pulled? "
+                          "Try a smaller --batch-size.", file=sys.stderr)
+                    raise
+                wait = 2 * (attempt + 1)
+                print(f"      · batch {start}-{start + len(batch)} hiccup ({exc}); "
+                      f"retrying in {wait}s…", file=sys.stderr)
+                time.sleep(wait)
 
 
 if __name__ == "__main__":
