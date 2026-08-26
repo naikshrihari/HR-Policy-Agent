@@ -48,12 +48,32 @@ def _llm_config() -> Dict[str, Any]:
 _FAST_MODE_REAL_NODES = {"ANSWER_AGENT_", "ANSWER_AGENT_SPANISH", "REDIRECT_LLM", "REDIRECT_LLM_SPANISH"}
 
 
-def _rag_context(state: Dict[str, Any], max_chars: int = 4000) -> str:
+def _rag_context(state: Dict[str, Any], max_chars: int = 5000) -> str:
+    """Build the answer context from the RAG node's retrieved evidence.
+
+    Prefers the supporting chunks / citations (the raw retrieved passages, each labelled
+    with its source document — mirroring what the full FINAL_ANWER_GENERATOR consumes),
+    and falls back to the joined ``value`` if a tool only produced that.
+    """
     nodes = state.get("nodes", {})
     for code in ("TAVERN_RAG", "REPRESENTED_RAG", "NON_REPRESENTED_RAG",
                  "REPRESENTED_RAG_SPANISH", "NON_REPRESENTED_RAG_SPANISH"):
         rag = nodes.get(code)
-        if isinstance(rag, dict) and rag.get("value"):
+        if not isinstance(rag, dict):
+            continue
+        chunks = rag.get("supportingChunks") or rag.get("citations") or []
+        parts = []
+        for c in chunks:
+            if not isinstance(c, dict):
+                continue
+            text = c.get("textChunk") or c.get("citedText") or ""
+            title = (c.get("documentIdentificationCriteria") or {}).get("documentTitle", "")
+            text = str(text).strip()
+            if text:
+                parts.append(f"[{title}]\n{text}" if title else text)
+        if parts:
+            return "\n\n".join(parts)[:max_chars]
+        if rag.get("value"):
             return str(rag["value"])[:max_chars]
     return ""
 
