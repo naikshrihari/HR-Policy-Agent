@@ -34,6 +34,16 @@ class Settings:
     llm_max_tokens: int = field(default_factory=lambda: int(os.getenv("HRPA_LLM_MAX_TOKENS", "4000")))
     llm_base_url: Optional[str] = field(default_factory=lambda: os.getenv("HRPA_LLM_BASE_URL"))
     llm_api_key: Optional[str] = field(default_factory=lambda: os.getenv("HRPA_LLM_API_KEY"))
+    # Ollama context window (num_ctx). Big enough to hold the prompt without truncation.
+    ollama_num_ctx: int = field(default_factory=lambda: int(os.getenv("HRPA_OLLAMA_NUM_CTX", "8192")))
+
+    # Fast mode: handle routing/query-reformulation with deterministic logic and give the
+    # single answer call a compact prompt, so only ~1 (small) LLM call runs per question
+    # instead of 5-6 large ones. Big speedup for local models; slightly less nuanced
+    # routing. Recommended when serving with Ollama on CPU.
+    fast_mode: bool = field(default_factory=lambda: _get_bool("HRPA_FAST_MODE", False))
+    # Print per-LLM-node timings to stderr (diagnostics).
+    timing: bool = field(default_factory=lambda: _get_bool("HRPA_TIMING", False))
 
     # ----- HCM / Oracle Fusion REST -------------------------------------------
     hcm_base_url: Optional[str] = field(default_factory=lambda: os.getenv("HRPA_HCM_BASE_URL"))

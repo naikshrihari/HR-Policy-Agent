@@ -166,6 +166,38 @@ The embedding provider used at query time must match the one used during ingest.
 > Only `huggingface` embeddings / `.[rag-semantic]` need torch — run those from a short
 > path such as `C:\dev\HR-Policy-Agent` with long paths enabled.
 
+## Performance (local models / Ollama)
+
+A full policy turn makes **5–6 sequential LLM calls**, and several ported Oracle prompts
+are large (the intent router is ~21 KB, the answer prompt ~22 KB). On a local CPU model
+that adds up to minutes per question. Two levers help a lot:
+
+**1. Fast mode** — deterministic routing + a single compact answer call:
+
+```bash
+python -m hr_policy_agent.cli --fast "What's the policy on removal of an unruly guest?"
+# or: export HRPA_FAST_MODE=true
+```
+
+Fast mode routes intent/language and reformulates the query with deterministic logic (no
+LLM), skips the answer-polishing pass, and gives the one real answer call a short prompt.
+Measured on a policy question: **6 calls / ~69 KB of prompts → 1 call / ~0.5 KB.** Routing
+is slightly less nuanced, but for handbook Q&A it's usually indistinguishable — and far
+faster.
+
+**2. Use a small model and see where time goes:**
+
+```bash
+ollama pull llama3.2:3b            # a 3B model is far faster than 8B on CPU
+export HRPA_LLM_MODEL=llama3.2:3b
+python -m hr_policy_agent.cli --fast --timings "How much bereavement leave do I get?"
+# [timing] ANSWER_AGENT_: 3.4s (prompt 478 chars)
+```
+
+Other knobs: `HRPA_LLM_MAX_TOKENS` bounds answer length (Ollama `num_predict`);
+`HRPA_OLLAMA_NUM_CTX` (default 8192) is the context window. The first call after starting
+Ollama also pays a one-time model-load cost.
+
 ## How the Oracle workflow maps to this project
 
 | Oracle node type | Where it lives here |

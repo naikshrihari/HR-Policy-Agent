@@ -42,22 +42,79 @@ def _llm_config() -> Dict[str, Any]:
         return json.load(f)
 
 
+# In fast mode, only these nodes hit the real model (with a compact prompt); every
+# other LLM node is handled by the deterministic heuristic router. This turns ~6 large
+# LLM calls per question into a single small one.
+_FAST_MODE_REAL_NODES = {"ANSWER_AGENT_", "ANSWER_AGENT_SPANISH", "REDIRECT_LLM", "REDIRECT_LLM_SPANISH"}
+
+
+def _rag_context(state: Dict[str, Any], max_chars: int = 4000) -> str:
+    nodes = state.get("nodes", {})
+    for code in ("TAVERN_RAG", "REPRESENTED_RAG", "NON_REPRESENTED_RAG",
+                 "REPRESENTED_RAG_SPANISH", "NON_REPRESENTED_RAG_SPANISH"):
+        rag = nodes.get(code)
+        if isinstance(rag, dict) and rag.get("value"):
+            return str(rag["value"])[:max_chars]
+    return ""
+
+
+def _compact_prompt(code: str, state: Dict[str, Any]) -> str:
+    """A short, fast prompt for the answer/redirect nodes (used in fast mode)."""
+    question = (state.get("nodes", {}).get("INPUT_USER_QUERY") or {}).get(
+        "searchQuery", state.get("input_message", ""))
+    spanish = code.endswith("SPANISH")
+    if code.startswith("REDIRECT_LLM"):
+        if spanish:
+            return ("Eres un asistente de políticas de RR. HH. La pregunta del usuario no trata "
+                    "sobre una política de RR. HH. Redirígelo amablemente en una frase.\n\n"
+                    f"Pregunta: {question}\nRespuesta:")
+        return ("You are an HR policy assistant. The user's question is not about an HR policy. "
+                "Politely redirect them in one sentence.\n\n"
+                f"Question: {question}\nAnswer:")
+    context = _rag_context(state)
+    if spanish:
+        return ("Eres un asistente de políticas de RR. HH. Usando ÚNICAMENTE el CONTEXTO, responde "
+                "la PREGUNTA de forma concisa (2-4 frases). Si la respuesta no está en el contexto, "
+                "di que el tema no está cubierto.\n\n"
+                f"CONTEXTO:\n{context}\n\nPREGUNTA: {question}\nRESPUESTA:")
+    return ("You are an HR policy assistant. Using ONLY the CONTEXT, answer the QUESTION concisely "
+            "(2-4 sentences). If the answer is not in the context, say the topic is not covered.\n\n"
+            f"CONTEXT:\n{context}\n\nQUESTION: {question}\nANSWER:")
+
+
 def run_llm_node(code: str, state: Dict[str, Any], settings: Settings) -> Any:
     """Execute LLM node ``code`` and return its ``$output`` value."""
     if settings.llm_provider.lower() == "fake":
         return fake_llm(code, state)
 
-    prompt_text = load_prompt(code)
-    rendered = render(prompt_text, build_context(state))
+    fast = settings.fast_mode
+    if fast and code not in _FAST_MODE_REAL_NODES:
+        # Routing, query reformulation, citation-picking: use deterministic heuristics.
+        return fake_llm(code, state)
 
-    cfg = _llm_config().get(code, {})
-    temperature = cfg.get("temperature")
-    max_tokens = cfg.get("max_tokens")
+    if fast:
+        rendered = _compact_prompt(code, state)
+        temperature, max_tokens = 0.2, 512
+    else:
+        rendered = render(load_prompt(code), build_context(state))
+        cfg = _llm_config().get(code, {})
+        temperature = cfg.get("temperature")
+        max_tokens = cfg.get("max_tokens")
+
     model = get_chat_model(settings, temperature=temperature, max_tokens=max_tokens)
 
     from langchain_core.messages import HumanMessage
 
-    response = model.invoke([HumanMessage(content=rendered)])
+    if settings.timing:
+        import sys
+        import time
+        start = time.time()
+        response = model.invoke([HumanMessage(content=rendered)])
+        print(f"[timing] {code}: {time.time() - start:.1f}s "
+              f"(prompt {len(rendered)} chars)", file=sys.stderr)
+    else:
+        response = model.invoke([HumanMessage(content=rendered)])
+
     content = response.content if hasattr(response, "content") else str(response)
 
     if code in STRUCTURED_NODES:

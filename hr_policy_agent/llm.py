@@ -46,7 +46,15 @@ def get_chat_model(settings: Settings, temperature: Optional[float] = None,
     if provider == "ollama":
         from langchain_ollama import ChatOllama
 
-        return ChatOllama(model=settings.llm_model, temperature=temp, base_url=settings.ollama_base_url)
+        # num_predict bounds generation length (Ollama defaults to unbounded, which is
+        # slow); num_ctx must be large enough to hold these long prompts.
+        return ChatOllama(
+            model=settings.llm_model,
+            temperature=temp,
+            base_url=settings.ollama_base_url,
+            num_predict=max_tok,
+            num_ctx=settings.ollama_num_ctx,
+        )
 
     raise ValueError(
         f"Unknown LLM provider {settings.llm_provider!r}. Use openai/anthropic/ollama, "

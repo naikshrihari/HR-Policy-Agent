@@ -50,13 +50,20 @@ def main(argv=None) -> int:
     parser.add_argument("--person-number", help="Team Member person number (overrides the mock default)")
     parser.add_argument("--html", action="store_true", help="Print the raw HTML response instead of plain text")
     parser.add_argument("--quiet", action="store_true", help="Suppress the startup banner")
+    parser.add_argument("--fast", action="store_true",
+                        help="Fast mode: deterministic routing + one compact LLM call (much faster on local models)")
+    parser.add_argument("--timings", action="store_true", help="Print per-LLM-node timings to stderr")
     args = parser.parse_args(argv)
 
     settings = get_settings()
+    if args.fast:
+        settings.fast_mode = True
+    if args.timings:
+        settings.timing = True
     agent = HRPolicyAgent(settings)
     if not args.quiet:
         print(f"[HR Policy Agent] LLM provider: {settings.llm_provider} | "
-              f"mock HCM={settings.use_mock_hcm} RAG={settings.use_mock_rag}\n")
+              f"fast={settings.fast_mode} | mock HCM={settings.use_mock_hcm} RAG={settings.use_mock_rag}\n")
 
     render = (lambda x: x) if args.html else html_to_text
 
