@@ -124,8 +124,11 @@ def build_document_tools(settings: Settings) -> Dict[str, BaseDocumentTool]:
         if settings.use_mock_rag:
             tools[node_code] = MockDocumentTool(node_code, meta["title"], meta["language"])
             continue
-        corpus = os.path.join(settings.rag_corpus_dir, meta["tool"])
-        retriever = _build_retriever(corpus, top_k=settings.rag_top_k)
+        if settings.rag_backend.lower() == "chroma":
+            retriever = _chroma_retriever(meta["tool"], settings)
+        else:
+            corpus = os.path.join(settings.rag_corpus_dir, meta["tool"])
+            retriever = _build_retriever(corpus, settings)
         if retriever is None:
             tools[node_code] = MockDocumentTool(node_code, meta["title"], meta["language"])
         else:
@@ -133,6 +136,31 @@ def build_document_tools(settings: Settings) -> Dict[str, BaseDocumentTool]:
                 node_code, meta["title"], meta["language"], retriever, top_k=settings.rag_top_k
             )
     return tools
+
+
+def _chroma_retriever(tool_code: str, settings: Settings):  # pragma: no cover - optional
+    """Return a retriever over the persisted Chroma collection for ``tool_code``.
+
+    Returns None (→ mock fallback) if Chroma/embeddings aren't installed or the
+    collection is empty (i.e. you haven't run the ingest script yet).
+    """
+    try:
+        from langchain_chroma import Chroma
+    except ImportError:
+        return None
+    from ..embeddings import get_embeddings
+
+    store = Chroma(
+        collection_name=tool_code,
+        persist_directory=settings.chroma_dir,
+        embedding_function=get_embeddings(settings),
+    )
+    try:
+        if store._collection.count() == 0:
+            return None
+    except Exception:
+        return None
+    return store.as_retriever(search_kwargs={"k": settings.rag_top_k})
 
 
 class _Chunk:
@@ -167,17 +195,20 @@ def _split_text(text: str, chunk_size: int = 1400, overlap: int = 150) -> List[s
     return chunks or ([text] if text.strip() else [])
 
 
-def _load_chunks(corpus_dir: str) -> List[_Chunk]:
+def load_chunks(corpus_dir: str, chunk_size: int = 1400, overlap: int = 150) -> List[_Chunk]:
+    """Load and chunk every supported (.txt/.md/.pdf/.docx) file under ``corpus_dir``."""
+    from .loaders import iter_corpus_files, load_file_text
+
     chunks: List[_Chunk] = []
-    for root, _dirs, files in os.walk(corpus_dir):
-        for fn in sorted(files):
-            if not fn.lower().endswith((".txt", ".md")):
-                continue
-            path = os.path.join(root, fn)
-            with open(path, encoding="utf-8", errors="ignore") as f:
-                for piece in _split_text(f.read()):
-                    chunks.append(_Chunk(piece, {"documentTitle": fn}))
+    for path, fn in iter_corpus_files(corpus_dir):
+        text = load_file_text(path)
+        for piece in _split_text(text, chunk_size, overlap):
+            chunks.append(_Chunk(piece, {"documentTitle": fn}))
     return chunks
+
+
+# Backwards-compatible alias.
+_load_chunks = load_chunks
 
 
 class TfidfRetriever:
@@ -204,8 +235,8 @@ class TfidfRetriever:
         return [self.chunks[i] for i in order[: self.top_k] if scores[i] > 0]
 
 
-def _build_retriever(corpus_dir: str, top_k: int = 6):  # pragma: no cover - optional live path
-    """Build an in-memory retriever over .txt/.md files in ``corpus_dir``.
+def _build_retriever(corpus_dir: str, settings: Settings):  # pragma: no cover - optional live path
+    """Build an in-memory retriever over .txt/.md/.pdf/.docx files in ``corpus_dir``.
 
     Prefers a torch-free scikit-learn TF-IDF retriever; falls back to a FAISS +
     sentence-transformers retriever only if scikit-learn is unavailable but those are
@@ -214,7 +245,8 @@ def _build_retriever(corpus_dir: str, top_k: int = 6):  # pragma: no cover - opt
     """
     if not os.path.isdir(corpus_dir):
         return None
-    chunks = _load_chunks(corpus_dir)
+    top_k = settings.rag_top_k
+    chunks = load_chunks(corpus_dir, settings.rag_chunk_size, settings.rag_chunk_overlap)
     if not chunks:
         return None
 

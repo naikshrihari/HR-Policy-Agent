@@ -51,6 +51,17 @@ class Settings:
     rag_corpus_dir: str = field(default_factory=lambda: os.getenv("HRPA_RAG_CORPUS_DIR", "data/corpus"))
     rag_top_k: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_TOP_K", "6")))
     use_mock_rag: bool = field(default_factory=lambda: _get_bool("HRPA_USE_MOCK_RAG", True))
+    # Retrieval backend when mock RAG is off: "tfidf" (in-memory, scikit-learn) or
+    # "chroma" (persistent vector database, requires an embedding model).
+    rag_backend: str = field(default_factory=lambda: os.getenv("HRPA_RAG_BACKEND", "tfidf"))
+    chroma_dir: str = field(default_factory=lambda: os.getenv("HRPA_CHROMA_DIR", "data/chroma"))
+    # Chunking used by both the TF-IDF loader and the ingest script.
+    rag_chunk_size: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_CHUNK_SIZE", "1400")))
+    rag_chunk_overlap: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_CHUNK_OVERLAP", "150")))
+
+    # ----- Embeddings (Chroma backend) ----------------------------------------
+    embedding_provider: str = field(default_factory=lambda: os.getenv("HRPA_EMBEDDING_PROVIDER", "openai"))
+    embedding_model: str = field(default_factory=lambda: os.getenv("HRPA_EMBEDDING_MODEL", "text-embedding-3-small"))
 
     # ----- Human-in-the-loop feedback -----------------------------------------
     # When False the feedback branch is auto-resolved (treated as APPROVED) so the

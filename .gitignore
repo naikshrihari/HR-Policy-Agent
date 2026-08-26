@@ -10,3 +10,4 @@ venv/
 .env
 data/corpus/
 !data/corpus/.gitkeep
+data/chroma/

@@ -70,7 +70,8 @@ With `HRPA_LLM_PROVIDER` set to a real provider, the verbatim prompts in
 
 ### Real RAG over your handbooks
 
-Drop handbook `.txt` / `.md` files into a per-tool sub-folder of the corpus directory:
+Drop handbook files — **`.txt`, `.md`, `.pdf`, or `.docx`** — into a per-tool sub-folder
+of the corpus directory (the folder names are the Oracle tool codes):
 
 ```
 data/corpus/
@@ -81,18 +82,64 @@ data/corpus/
   NON_REP_SPANISH_DOCUMENT_TOOL_WORKFLOW_V3/     # Non-Represented handbook (ES)
 ```
 
-Then enable it:
+There are two retrieval backends (choose with `HRPA_RAG_BACKEND`):
+
+#### 1. TF-IDF — no embeddings, no vector DB (default, simplest)
 
 ```bash
-pip install '.[rag]'            # lightweight: scikit-learn TF-IDF (no torch)
-export HRPA_USE_MOCK_RAG=false
+pip install '.[rag]' '.[docs]'     # scikit-learn + pypdf/docx2txt (all torch-free)
+export HRPA_USE_MOCK_RAG=false      # HRPA_RAG_BACKEND defaults to "tfidf"
 export HRPA_RAG_CORPUS_DIR=data/corpus
+python -m hr_policy_agent.cli "How much bereavement leave do I get?"
 ```
 
-The default retriever is a torch-free scikit-learn TF-IDF search, which avoids the huge
-`torch` download (and the Windows 260-char path errors it can cause). For semantic
-embeddings instead, `pip install '.[rag-semantic]'` (FAISS + sentence-transformers) —
-larger, and best run from a short path such as `C:\dev\HR-Policy-Agent`.
+Documents are loaded, chunked, and indexed in memory at startup. Great to get going.
+
+#### 2. Embeddings + Chroma vector database (semantic search, persistent)
+
+**Step 1 — embed your PDFs/DOCX into the vector DB** (run once, and whenever docs change):
+
+```bash
+pip install '.[vectordb]'                 # langchain-chroma + pypdf/docx2txt + openai embeddings
+
+# pick an embedding model — OpenAI is torch-free and best on Windows:
+export HRPA_EMBEDDING_PROVIDER=openai
+export HRPA_EMBEDDING_MODEL=text-embedding-3-small
+export HRPA_LLM_API_KEY=sk-...            # your OpenAI key (used for embeddings)
+
+python -m scripts.ingest                  # reads data/corpus/<tool>/…  →  data/chroma/
+```
+
+The ingest script reads every `.txt/.md/.pdf/.docx` under each tool folder, splits it into
+~1400-char chunks, embeds each chunk, and stores it in a **Chroma collection named after
+the handbook**. Options: `--corpus-dir`, `--chroma-dir`, `--reset` (rebuild from scratch).
+
+**Step 2 — serve using the vector DB:**
+
+```bash
+export HRPA_USE_MOCK_RAG=false
+export HRPA_RAG_BACKEND=chroma
+export HRPA_EMBEDDING_PROVIDER=openai      # must match what you ingested with
+export HRPA_LLM_API_KEY=sk-...
+python -m hr_policy_agent.cli "How much bereavement leave do I get?"
+```
+
+At query time each handbook's Chroma collection is loaded and queried by embedding
+similarity; the top chunks feed the answer + citation cards. If a collection is empty
+(you haven't ingested it yet) that route falls back to the mock passage.
+
+**Embedding provider options** (`HRPA_EMBEDDING_PROVIDER`):
+
+| Value | Model | Notes |
+|---|---|---|
+| `openai` | `text-embedding-3-small` | **Recommended.** Torch-free, needs an API key. |
+| `huggingface` | `all-MiniLM-L6-v2` | Local/offline, but pulls in `torch` (`pip install '.[rag-semantic]'`). |
+| `fake` | deterministic hash | No deps — for offline demos/tests only, not real semantics. |
+
+> **Windows tip:** the `openai` embedding provider and the TF-IDF backend are both
+> torch-free, so they avoid the `WinError 206` long-path failure that `torch` triggers.
+> Only `huggingface` embeddings / `.[rag-semantic]` need torch — run those from a short
+> path such as `C:\dev\HR-Policy-Agent` with long paths enabled.
 
 ## How the Oracle workflow maps to this project
 
