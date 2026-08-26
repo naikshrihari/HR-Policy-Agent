@@ -53,3 +53,14 @@ def test_feedback_positive_and_negative():
     done = handle_feedback("REJECTED", "1", "EN", store, settings)
     assert not done["needs_detail"]
     assert any(r["operation"] == "NegativeFeedback" for r in store.logged)
+
+
+def test_cli_html_to_text_strips_markup():
+    from hr_policy_agent.cli import html_to_text
+    html = ('Answer line one.<br><br> <details open><summary><b>Source</b></summary>'
+            '<div><span>1</span><span>Handbook</span><div>&ldquo;cited text&rdquo;</div></div></details><hr>')
+    out = html_to_text(html)
+    assert "<" not in out and ">" not in out          # no tags
+    assert "Answer line one." in out
+    assert "Source:" in out
+    assert "1 Handbook" in out                          # badge + title not fused

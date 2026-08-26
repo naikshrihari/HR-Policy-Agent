@@ -90,11 +90,16 @@ class RetrieverDocumentTool(BaseDocumentTool):
 
     def __init__(self, node_code: str, title: str, language: str,
                  retriever: Any, answer_fn: Optional[Callable[[str, List[str]], str]] = None,
-                 top_k: int = 6):
+                 top_k: int = 6, answer_max_chunks: int = 0):
         super().__init__(node_code, title, language)
         self.retriever = retriever
         self.answer_fn = answer_fn
         self.top_k = top_k
+        # How many top chunks feed the ``value``. 0 = all retrieved. A real LLM at the
+        # ANSWER_AGENT_ step synthesizes a concise answer from full context, so 0 is fine
+        # there; the offline "fake" provider echoes ``value`` verbatim, so it is limited
+        # to the single best chunk to avoid dumping every retrieved passage.
+        self.answer_max_chunks = answer_max_chunks
 
     def query(self, question: str) -> Dict[str, Any]:
         docs = self.retriever.invoke(question)[: self.top_k]
@@ -109,7 +114,11 @@ class RetrieverDocumentTool(BaseDocumentTool):
                               "documentIdentificationCriteria": {"documentTitle": title}})
             chunks.append({"textChunk": text,
                            "documentIdentificationCriteria": {"documentTitle": title}})
-        value = self.answer_fn(question, texts) if self.answer_fn else "\n\n".join(texts)
+        if self.answer_fn:
+            value = self.answer_fn(question, texts)
+        else:
+            limit = self.answer_max_chunks or len(texts)
+            value = "\n\n".join(texts[:limit])
         return {"value": value, "citations": citations, "supportingChunks": chunks}
 
 
@@ -132,8 +141,12 @@ def build_document_tools(settings: Settings) -> Dict[str, BaseDocumentTool]:
         if retriever is None:
             tools[node_code] = MockDocumentTool(node_code, meta["title"], meta["language"])
         else:
+            # The offline "fake" provider echoes the RAG value, so keep it to the single
+            # best chunk; real LLMs synthesize from full context, so pass all chunks.
+            answer_max = 1 if settings.llm_provider.lower() == "fake" else 0
             tools[node_code] = RetrieverDocumentTool(
-                node_code, meta["title"], meta["language"], retriever, top_k=settings.rag_top_k
+                node_code, meta["title"], meta["language"], retriever,
+                top_k=settings.rag_top_k, answer_max_chunks=answer_max,
             )
     return tools
 
