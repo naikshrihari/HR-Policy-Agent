@@ -93,13 +93,21 @@ def _compact_prompt(code: str, state: Dict[str, Any], context_chars: int = 5000)
                 f"Question: {question}\nAnswer:")
     context = _rag_context(state, max_chars=context_chars)
     if spanish:
-        return ("Eres un asistente de políticas de RR. HH. Usando ÚNICAMENTE el CONTEXTO, responde "
-                "la PREGUNTA de forma concisa (2-4 frases). Si la respuesta no está en el contexto, "
-                "di que el tema no está cubierto.\n\n"
-                f"CONTEXTO:\n{context}\n\nPREGUNTA: {question}\nRESPUESTA:")
-    return ("You are an HR policy assistant. Using ONLY the CONTEXT, answer the QUESTION concisely "
-            "(2-4 sentences). If the answer is not in the context, say the topic is not covered.\n\n"
-            f"CONTEXT:\n{context}\n\nQUESTION: {question}\nANSWER:")
+        return (
+            "Eres un asistente de políticas de RR. HH. Responde ÚNICAMENTE la PREGUNTA del usuario, "
+            "usando SOLO los datos del CONTEXTO que la responden directamente. El CONTEXTO puede "
+            "incluir varias políticas no relacionadas — IGNÓRALAS por completo. Responde en 1 a 3 "
+            "frases con solo la respuesta; no menciones otras políticas ni agregues información "
+            "adicional. Si el CONTEXTO no contiene la respuesta, responde exactamente: "
+            "'Este tema no está cubierto en los documentos de política disponibles.'\n\n"
+            f"CONTEXTO:\n{context}\n\nPREGUNTA: {question}\nRESPUESTA:")
+    return (
+        "You are an HR policy assistant. Answer ONLY the user's QUESTION, using ONLY the facts in "
+        "the CONTEXT that directly answer it. The CONTEXT may contain several unrelated policies — "
+        "IGNORE those completely. Reply in 1 to 3 sentences with just the answer; do not list or "
+        "mention other policies, and do not add extra details. If the CONTEXT does not contain the "
+        "answer, reply exactly: 'This topic is not covered in the available policy documents.'\n\n"
+        f"CONTEXT:\n{context}\n\nQUESTION: {question}\nANSWER:")
 
 
 def run_llm_node(code: str, state: Dict[str, Any], settings: Settings) -> Any:
