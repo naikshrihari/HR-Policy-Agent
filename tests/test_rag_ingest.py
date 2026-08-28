@@ -121,3 +121,23 @@ def test_word_safe_chunking_never_splits_mid_word():
     for c in chunks:
         assert not c.startswith(" ") and "  " not in c
         assert c.split()[0].isascii()
+
+
+def test_focused_citation_shows_only_the_source_used():
+    from hr_policy_agent.codenodes.citation_details import focused_citation
+    rag = [{"supportingChunks": [
+        {"textChunk": "Pay Corrections. Corrections to a Team Member's paycheck must be brought "
+                      "to the attention of their supervisor or department manager.",
+         "documentIdentificationCriteria": {"documentTitle": "Handbook"}},
+        {"textChunk": "Voting Leave. Team Members may take paid time off to vote.",
+         "documentIdentificationCriteria": {"documentTitle": "Handbook"}},
+    ]}]
+    card = focused_citation(
+        "Corrections to your paycheck should be brought to your supervisor or department manager.",
+        rag, "EN")
+    assert "paycheck must be brought" in card          # the used chunk
+    assert "Voting Leave" not in card                  # the unused chunk is excluded
+    assert card.count("<details") == 1                 # exactly one source shown
+    # No citation for a not-covered or unrelated answer.
+    assert focused_citation("This topic is not covered in the available policy documents.", rag, "EN") == ""
+    assert focused_citation("The sky is blue.", rag, "EN") == ""

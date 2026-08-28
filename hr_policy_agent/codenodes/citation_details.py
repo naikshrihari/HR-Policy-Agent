@@ -558,3 +558,81 @@ def get_citation_details(agent_response: str, agent_response_topic: str,
     label = labels["source"] if len(blocks) == 1 else f'{labels["sources"]} ({len(blocks)})'
     return ("<br><br><details open><summary><b>" + label + "</b></summary>"
             + "".join(blocks) + "</details><hr>")
+
+
+# ---------------------------------------------------------------------------
+# Focused citation — show ONLY the single source chunk the answer came from.
+# ---------------------------------------------------------------------------
+_NOT_COVERED_MARKERS = (
+    "not covered in the available policy",
+    "no está cubierto en los documentos",
+    "no esta cubierto en los documentos",
+)
+
+
+def focused_citation(answer_text: str, rag_outputs: List[Dict[str, Any]],
+                     language: str = "EN") -> str:
+    """Render a single "Source" card for the chunk the ANSWER was actually drawn from.
+
+    Picks the retrieved supporting chunk whose wording best overlaps the final answer,
+    shows only that one (with its source document and the most relevant sentence), and
+    renders nothing when the answer is the "not covered" fallback or nothing matches.
+    """
+    lang = "ES" if str(language).upper() == "ES" else "EN"
+    labels = LABELS[lang]
+    ans = (answer_text or "").strip()
+    if not ans:
+        return ""
+    low = ans.lower()
+    if any(m in low for m in _NOT_COVERED_MARKERS):
+        return ""
+
+    ans_terms = set(_tokenize(ans))
+    if not ans_terms:
+        return ""
+
+    # Gather candidate chunks (retrieved supporting passages).
+    candidates = []
+    for out in (rag_outputs or []):
+        if not isinstance(out, dict):
+            continue
+        for c in (out.get("supportingChunks") or out.get("citations") or []):
+            if not isinstance(c, dict):
+                continue
+            text = str(_get_chunk_text(c) or c.get("citedText") or "").strip()
+            if text:
+                candidates.append((text, _get_doc_title(c)))
+    if not candidates:
+        return ""
+
+    # Best chunk = highest fraction of the answer's terms it contains.
+    best = None  # (overlap, text, title)
+    for text, title in candidates:
+        cset = set(_tokenize(text))
+        if not cset:
+            continue
+        overlap = len(ans_terms & cset) / len(ans_terms)
+        if best is None or overlap > best[0]:
+            best = (overlap, text, title)
+    if best is None or best[0] < 0.25:  # answer isn't grounded in any chunk -> no citation
+        return ""
+
+    _, chunk_text, title = best
+
+    # Most relevant sentence(s) of that chunk, capped for readability.
+    sentences = [s for s in _split_sentences(chunk_text) if len(s) >= 12] or [chunk_text]
+    sentences.sort(key=lambda s: len(set(_tokenize(s)) & ans_terms), reverse=True)
+    excerpt = sentences[0]
+    if len(excerpt) > 320:
+        cut = excerpt[:320]
+        sp = cut.rfind(" ")
+        excerpt = (cut[:sp] if sp > 200 else cut) + "…"
+
+    card_style = "border:1px solid #d9d9d6;border-radius:8px;padding:10px 12px;margin:6px 0;"
+    title_style = "font-size:13px;font-weight:600;"
+    snippet_style = "font-size:13px;color:#5f5e5a;margin:6px 0 0;line-height:1.5;"
+    card = (
+        f'<div style="{card_style}"><span style="{title_style}">{_esc(title)}</span>'
+        f'<div style="{snippet_style}">&ldquo;{_esc(excerpt)}&rdquo;</div></div>'
+    )
+    return f'<br><br><details open><summary><b>{labels["source"]}</b></summary>{card}</details><hr>'

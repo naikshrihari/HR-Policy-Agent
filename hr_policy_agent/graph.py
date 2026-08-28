@@ -247,14 +247,14 @@ def build_graph(settings: Optional[Settings] = None, services: Optional[Services
             {"result": script_json}, citation_only, state["nodes"].get(answer_code, ""))
         updates["nodes"][resp_code] = {"result": agent_response}
 
-        # GET_THE_CITATION_DETAILS — render the citation cards.
+        # Citation card — show ONLY the source chunk the final answer was drawn from.
         rag_code = _RAG_BY_TYPE[lang].get(_tm_type(state)) or _RAG_BY_TYPE[lang]["NON REPRESENTED"]
         details_code = "GET_THE_CITATION_DETAILS_SPANISH" if lang == "ES" else "GET_THE_CITATION_DETAILS_ENGLISH"
-        html = citation_details.get_citation_details(
-            agent_response=agent_response,
-            agent_response_topic=state["nodes"].get(answer_code, ""),
+        best_code = "GET_THE_BEST_ANSWER_SPANISH" if lang == "ES" else "GET_THE_BEST_ANSWER"
+        final_answer_text = _code_result(state, best_code, "") or state["nodes"].get(answer_code, "")
+        html = citation_details.focused_citation(
+            answer_text=final_answer_text,
             rag_outputs=[state["nodes"].get(rag_code) or {}],
-            query_text=state.get("input_message", ""),
             language=lang,
         )
         updates["nodes"][details_code] = {"result": html}
