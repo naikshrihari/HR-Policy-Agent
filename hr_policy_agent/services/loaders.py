@@ -38,13 +38,77 @@ def _load_pdf(path: str) -> str:
         raise ImportError(
             "Reading PDFs needs 'pypdf'. Install it with:  pip install '.[docs]'  (or  pip install pypdf)"
         ) from exc
+
+    from ..config import get_settings
+    settings = get_settings()
+    ocr_enabled = settings.ocr_enabled
+    ocr_state = {"ok": ocr_enabled, "doc": None}  # lazily opened fitz doc; disabled on failure
+
     reader = PdfReader(path)
     pages = []
-    for page in reader.pages:
+    for i, page in enumerate(reader.pages):
         text = page.extract_text() or ""
+        # A page with little extractable text is likely image-based (scanned page or a
+        # graphic with the text baked in) -> OCR it if enabled.
+        if ocr_state["ok"] and len(text.strip()) < settings.ocr_min_chars:
+            ocr_text = _ocr_pdf_page(path, i, settings, ocr_state)
+            if len(ocr_text.strip()) > len(text.strip()):
+                text = ocr_text
         if text.strip():
             pages.append(clean_pdf_text(text))
+    if ocr_state.get("doc") is not None:
+        try:
+            ocr_state["doc"].close()
+        except Exception:
+            pass
     return "\n\n".join(pages)
+
+
+_OCR_WARNED = False
+
+
+def _ocr_pdf_page(path: str, page_index: int, settings, ocr_state) -> str:
+    """OCR a single PDF page (rendered via PyMuPDF) with Tesseract.
+
+    Returns "" and disables OCR for the rest of the run if the OCR stack isn't
+    available (PyMuPDF/pytesseract not installed, or the Tesseract binary missing),
+    printing a single clear message so ingest still completes on the text it has.
+    """
+    global _OCR_WARNED
+    try:
+        import io
+
+        import fitz  # PyMuPDF — renders pages to images without an external poppler
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        if not _OCR_WARNED:
+            _OCR_WARNED = True
+            print("  [ocr] OCR is enabled but its packages are missing — install with: "
+                  "pip install '.[ocr]'  (and the Tesseract binary). Skipping OCR.")
+        ocr_state["ok"] = False
+        return ""
+
+    try:
+        if ocr_state["doc"] is None:
+            ocr_state["doc"] = fitz.open(path)
+        page = ocr_state["doc"][page_index]
+        pix = page.get_pixmap(dpi=settings.ocr_dpi)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
+        return pytesseract.image_to_string(img, lang=settings.ocr_language) or ""
+    except pytesseract.TesseractNotFoundError:
+        if not _OCR_WARNED:
+            _OCR_WARNED = True
+            print("  [ocr] Tesseract binary not found. Install Tesseract-OCR and ensure it is "
+                  "on PATH (Windows: the UB Mannheim installer). Skipping OCR.")
+        ocr_state["ok"] = False
+        return ""
+    except Exception as exc:  # noqa: BLE001 - never let OCR abort ingest
+        if not _OCR_WARNED:
+            _OCR_WARNED = True
+            print(f"  [ocr] OCR failed ({exc}); continuing with extracted text only.")
+        ocr_state["ok"] = False
+        return ""
 
 
 import re as _re

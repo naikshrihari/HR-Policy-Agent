@@ -140,6 +140,22 @@ If the right chunk is missing entirely, it's a retrieval miss (try the Chroma em
 backend, or a smaller `HRPA_RAG_CHUNK_SIZE`). If it's present but the answer ignored it,
 raise `HRPA_ANSWER_CONTEXT_CHARS` (default 5000) so lower-ranked chunks reach the model.
 
+Scanned / image-based PDFs (OCR): if a PDF's text is baked into images, `pypdf`
+extracts nothing and that content is invisible to search. Enable OCR to read those
+pages (needs the Tesseract binary installed):
+
+```bash
+pip install '.[ocr]'          # PyMuPDF + pytesseract + Pillow
+# Windows: also install Tesseract-OCR (UB Mannheim build) and keep it on PATH
+export HRPA_OCR_ENABLED=true
+export HRPA_OCR_LANGUAGE=eng      # or eng+spa for bilingual handbooks
+python -m scripts.ingest --reset
+```
+
+Any page with under `HRPA_OCR_MIN_CHARS` (default 100) of extractable text is rendered
+and OCR'd automatically. If OCR isn't installed it's skipped with a message, and text
+PDFs are unaffected.
+
 Retrieval quality notes:
 * Documents are split **section-aware** — each handbook heading (e.g. "Voting Leave")
   starts a new chunk, so a topic is retrieved as a unit rather than blended with its

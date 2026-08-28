@@ -82,6 +82,15 @@ class Settings:
     rag_chunk_size: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_CHUNK_SIZE", "600")))
     rag_chunk_overlap: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_CHUNK_OVERLAP", "150")))
 
+    # ----- OCR (for image-based / scanned PDF pages) --------------------------
+    # When on, any PDF page whose extractable text is shorter than ocr_min_chars is
+    # rendered and OCR'd (needs the [ocr] extra + the Tesseract binary).
+    ocr_enabled: bool = field(default_factory=lambda: _get_bool("HRPA_OCR_ENABLED", False))
+    ocr_min_chars: int = field(default_factory=lambda: int(os.getenv("HRPA_OCR_MIN_CHARS", "100")))
+    ocr_dpi: int = field(default_factory=lambda: int(os.getenv("HRPA_OCR_DPI", "200")))
+    # Tesseract language(s), e.g. "eng" or "eng+spa" for bilingual handbooks.
+    ocr_language: str = field(default_factory=lambda: os.getenv("HRPA_OCR_LANGUAGE", "eng"))
+
     # ----- Embeddings (Chroma backend) ----------------------------------------
     embedding_provider: str = field(default_factory=lambda: os.getenv("HRPA_EMBEDDING_PROVIDER", "openai"))
     embedding_model: str = field(default_factory=lambda: os.getenv("HRPA_EMBEDDING_MODEL", "text-embedding-3-small"))
