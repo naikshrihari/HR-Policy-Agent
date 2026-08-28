@@ -164,9 +164,14 @@ def build_graph(settings: Optional[Settings] = None, services: Optional[Services
         lang = _lang(state)
         tm = _tm_type(state)
         rag_code = _RAG_BY_TYPE[lang].get(tm) or _RAG_BY_TYPE[lang]["NON REPRESENTED"]
-        combine_code = ("COMBINE_USER_QUERY_AND_QUERY_FORMULATION_CODE_SPANISH"
-                        if lang == "ES" else "COMBINE_USER_QUERY_AND_QUERY_FORMULATION_CODE")
-        question = _code_result(state, combine_code, "")
+        # Retrieve with the CLEAN reformulated question. The Oracle COMBINE node wraps the
+        # query with instruction boilerplate ("Question: … IMPORTANT: Retrieve only …")
+        # meant for Oracle's RAG tool; that text pollutes a vector/keyword query and hurts
+        # retrieval, so we search with the plain question (matching scripts.search).
+        cq_code = "CREATE_UNIQUE_QUERY_SPANISH" if lang == "ES" else "CREATE_UNIQUE_QUERY"
+        question = (state["nodes"].get(cq_code)
+                    or (state["nodes"].get("INPUT_USER_QUERY") or {}).get("searchQuery")
+                    or state.get("input_message", ""))
         result = services.doc_tools[rag_code].query(question)
         return _set(rag_code, result)
 
