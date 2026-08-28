@@ -58,7 +58,11 @@ def handle_feedback(rating: str, detail: Optional[str], language: str,
     if detail is None:
         return {"response": NEGATIVE_PROMPT[lang], "needs_detail": True}
 
-    state = {"input_message": "", "nodes": {}, "feedback_detail": detail}
+    # Expose the human feedback under the HUMAN node code the check prompt reads
+    # ({{...NEGATIVE_FEEDBACK_INPUT.$feedbackRecieved}}).
+    human_code = "NEGATIVE_FEEDBACK_INPUT_SPANISH" if lang == "ES" else "NEGATIVE_FEEDBACK_INPUT"
+    state = {"input_message": "", "feedback_detail": detail,
+             "nodes": {human_code: {"feedbackRecieved": detail}}}
     check_code = "NEGATIVE_FEEDBACK_INPUT_CHECK_SPANISH" if lang == "ES" else "NEGATIVE_FEEDBACK_INPUT_CHECK"
     if settings.llm_provider.lower() == "fake":
         valid = bool(fake_llm(check_code, state))

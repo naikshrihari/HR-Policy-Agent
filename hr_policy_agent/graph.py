@@ -133,14 +133,18 @@ def build_graph(settings: Optional[Settings] = None, services: Optional[Services
     def intent_route(state: AgentState) -> Dict[str, Any]:
         out = run_llm_node("INTENT_ROUTE_LLM", state, settings)
         language = "ES" if str(out.get("language", "EN")).upper() == "ES" else "EN"
-        return {"nodes": {"INTENT_ROUTE_LLM": out}, "language": language}
+        # LANGUAGE_ROUTER_ is a routing node in the original; expose its decision (the
+        # language) so prompts that read {{...LANGUAGE_ROUTER_.$output}} resolve.
+        return {"nodes": {"INTENT_ROUTE_LLM": out, "LANGUAGE_ROUTER_": language}, "language": language}
 
     def greeting_response(state: AgentState) -> Dict[str, Any]:
         return {"final_response": GREETING_RESPONSES[_lang(state)]}
 
     def create_unique_query(state: AgentState) -> Dict[str, Any]:
         code = "CREATE_UNIQUE_QUERY_SPANISH" if _lang(state) == "ES" else "CREATE_UNIQUE_QUERY"
-        return _set(code, run_llm_node(code, state, settings))
+        query = run_llm_node(code, state, settings)
+        # QUERY_FORMULATION is the reformulated query alias some prompts read.
+        return {"nodes": {code: query, "QUERY_FORMULATION": query}}
 
     def combine_query(state: AgentState) -> Dict[str, Any]:
         lang = _lang(state)

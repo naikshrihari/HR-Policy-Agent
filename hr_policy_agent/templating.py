@@ -125,6 +125,9 @@ def render(template: str, context: Dict[str, Any]) -> str:
 
 def build_context(state: Dict[str, Any]) -> Dict[str, Any]:
     """Assemble the resolver context from graph state."""
+    from datetime import datetime
+
+    now = datetime.now()
     return {
         "nodes": state.get("nodes", {}),
         "workflow": {
@@ -134,5 +137,8 @@ def build_context(state: Dict[str, Any]) -> Dict[str, Any]:
         },
         "system": {
             "inputMessage": state.get("input_message", ""),
+            "currentDate": now.strftime("%Y-%m-%d"),
+            "currentDateTime": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "chatHistory": state.get("chat_history", ""),
         },
     }
