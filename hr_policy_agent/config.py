@@ -79,7 +79,7 @@ class Settings:
     rag_backend: str = field(default_factory=lambda: os.getenv("HRPA_RAG_BACKEND", "tfidf"))
     chroma_dir: str = field(default_factory=lambda: os.getenv("HRPA_CHROMA_DIR", "data/chroma"))
     # Chunking used by both the TF-IDF loader and the ingest script.
-    rag_chunk_size: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_CHUNK_SIZE", "900")))
+    rag_chunk_size: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_CHUNK_SIZE", "600")))
     rag_chunk_overlap: int = field(default_factory=lambda: int(os.getenv("HRPA_RAG_CHUNK_OVERLAP", "150")))
 
     # ----- Embeddings (Chroma backend) ----------------------------------------

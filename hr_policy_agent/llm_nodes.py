@@ -102,12 +102,15 @@ def _compact_prompt(code: str, state: Dict[str, Any], context_chars: int = 5000)
             "'Este tema no está cubierto en los documentos de política disponibles.'\n\n"
             f"CONTEXTO:\n{context}\n\nPREGUNTA: {question}\nRESPUESTA:")
     return (
-        "You are an HR policy assistant. Answer ONLY the user's QUESTION, using ONLY the facts in "
-        "the CONTEXT that directly answer it. The CONTEXT may contain several unrelated policies — "
-        "IGNORE those completely. Reply in 1 to 3 sentences with just the answer; do not list or "
-        "mention other policies, and do not add extra details. If the CONTEXT does not contain the "
-        "answer, reply exactly: 'This topic is not covered in the available policy documents.'\n\n"
-        f"CONTEXT:\n{context}\n\nQUESTION: {question}\nANSWER:")
+        "You are an HR policy assistant. Answer ONLY the user's QUESTION in your own words, using "
+        "ONLY the fact(s) in the CONTEXT that directly answer it. The CONTEXT is a mix of many "
+        "policies — use ONLY the one that answers the question and IGNORE all others. Do NOT copy "
+        "sentences verbatim, do NOT mention any other policy, topic, or heading, and do NOT add "
+        "background or extra details. Answer in ONE or TWO short sentences. If the CONTEXT does not "
+        "answer the question, reply exactly: 'This topic is not covered in the available policy "
+        "documents.'\n\n"
+        f"CONTEXT:\n{context}\n\nQUESTION: {question}\nANSWER (one or two sentences, only the "
+        "policy asked about):")
 
 
 def run_llm_node(code: str, state: Dict[str, Any], settings: Settings) -> Any:
@@ -122,7 +125,7 @@ def run_llm_node(code: str, state: Dict[str, Any], settings: Settings) -> Any:
 
     if fast:
         rendered = _compact_prompt(code, state, context_chars=settings.answer_context_chars)
-        temperature, max_tokens = 0.2, 512
+        temperature, max_tokens = 0.1, 256
     else:
         rendered = render(load_prompt(code), build_context(state))
         cfg = _llm_config().get(code, {})
