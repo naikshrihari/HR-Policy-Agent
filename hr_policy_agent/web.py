@@ -64,6 +64,10 @@ def create_app():
             state = _agent().run(req.message, person_number=req.person_number,
                                  conversation_id=conversation_id)
         except Exception as exc:  # noqa: BLE001 - surface a friendly error to the UI
+            # Print the full traceback to the server console so the cause is visible
+            # in the terminal (the browser only gets the short message).
+            import traceback
+            traceback.print_exc()
             return JSONResponse(status_code=500, content={"error": str(exc)})
         return JSONResponse({
             "response": state.get("final_response", ""),
